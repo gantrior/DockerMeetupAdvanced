@@ -1,18 +1,12 @@
-# Lab 1: Docker 101 (Linux): Basic Docker Commands,Building Docker Images, and Accessing Local Files
+# Docker Advanced - Linux (Part 1 ): Introduction and Setup
 
-In this lab we'll take a look at some basic Docker commands and a simple build-ship-run workflow. We'll start by running some simple docker containers. Then we'll use a *Dockerfile* to build a custom app. Finally, we'll look at how to use bind mounts to modify a running container as you might if you were actively developing using Docker.
+In this lab we'll setup access for DockerID and LinuxVMs.
 
-> **Difficulty**: Beginner (assumes no familiarity with Docker)
 
-> **Time**: Approximately 10 minutes
+> * [Task 1: Prerequisites](#Task_1)
+> * [Task 2: Simple Docker container](#Task_2)
 
-> **Tasks**:
->
-
-> * [Task 0: Prerequisites](#Task_0)
-> * [Task 1: Run some simple Docker containers](#Task_1)
-
-## <a name="task0"></a>Task 0: Prerequisites
+## <a name="task1"></a>Task 1: Prerequisites
 
 Before we start, you'll need to gain access to your Linux VM, clone a GitHub repo, and make sure you have a DockerID.
 
@@ -33,29 +27,23 @@ All of the exercises in this lab will be performed in the console window on the 
 Use the following command to clone the lab repo from GitHub.
 
 ```
-$ git clone https://github.com/leecalcote/containers-101.git
-Cloning into 'containers-101'...
-remote: Counting objects: 14, done.
-remote: Compressing objects: 100% (9/9), done.
-remote: Total 14 (delta 5), reused 14 (delta 5), pack-reused 0
-Unpacking objects: 100% (14/14), done.
+$ git clone https://github.com/ivoklimsa/DockerMeetupAdvanced.git
+Cloning into 'DockerMeetupAdvanced'...
+remote: Counting objects: 88, done.
+remote: Compressing objects: 100% (40/40), done.
+remote: Total 88 (delta 33), reused 88 (delta 33), pack-reused 0
+Unpacking objects: 100% (88/88), done.
 ```
 
-## <a name="Task_1"></a>Task 1: Run some simple Docker containers
+## <a name="task2"></a>Task 2: Run some simple Docker containers
 
-There are different ways to use containers:
-
-1. **To run a single task:** This could be a shell script or a custom app
-2. **Interactively:** This connects you to the container similar to the way you SSH into a remote server
-3. **In the background:** For long-running services like websites and databases
-
-In this section you'll try each of those options and see how Docker manages the workload.
+In this section you'll deploy simple Docker container.
 
 ### Run a single-task Alpine Linux container
 
 In this step we're going to start a new container and tell it to run the `hostname` command. The container will start, execute the `hostname` command, then exit.
 
-1. Run the following command in your Linux console:
+Run the following command in your Linux console:
 
     ```
     $ docker container run alpine hostname
@@ -70,17 +58,3 @@ In this step we're going to start a new container and tell it to run the `hostna
     The output above shows that the `alpine:latest` image could not be found locally. When this happens, Docker automatically *pulls* it form Docker Hub.
 
     After the image is pulled, the container's hostname is displayed (`888e89a3b36b` in the example above).
-
-2. Docker keeps a container running as long as the process it started inside the container is still running. In this case, the `hostname` process completes when the output is written, so the container exits. The Docker platform doesn't delete resources by default, so the container still exists in the `Exited` state.
-
-    List all containers
-
-    ```
-    $ docker container ls --all
-    CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS            PORTS               NAMES
-    888e89a3b36b        alpine              "hostname"          50 seconds ago      Exited (0) 49 seconds ago                       awesome_elion
-    ```
-
-    Notice that your Alpine Linux container is in the `Exited` state.
-
-    > **Note:** The container ID *is* the hostname that the container displayed. In the example above it's `888e89a3b36b`
