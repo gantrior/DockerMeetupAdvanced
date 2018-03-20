@@ -8,7 +8,7 @@ This section will cover how to use multiple hosts to provide fault tolerance as 
 > * [Task 1: Build your own cluster](#Task_1)
 > * [Task 2: Deploying an Application with Docker Swarm](#Task_2)
 > * [Task 3: Upgrades and Rollback](#Task_3)
-> * [Task 4: Upgrades and Rollback](#Task_4)
+> * [Task 4: Scale the front end](#Task_4)
 > * [Task 5: Failure and recovery](#Task_5)
 
 
