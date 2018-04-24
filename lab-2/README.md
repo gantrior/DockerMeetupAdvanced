@@ -26,10 +26,10 @@ Let's start by looking at layers and how files written to a container are manage
 1. Pull down the Debian:Jessie image
 
     ```
-    $ docker image pull debian:jessie
+    $ docker image pull debian:stretch-slim
     jessie: Pulling from library/debian
-    85b1f47fba49: Pull complete
-    Digest: sha256:f51cf81db2de8b5e9585300f655549812cdb27c56f8bfb992b8b706378cd517d
+    2a72cbf407d6: Pull complete
+    Digest: sha256:613efd414e9818dcef858201484a94603a548a0e04fd4356e77eb758aeb16124
     Status: Downloaded newer image for debian:jessie
     ```
 
@@ -39,7 +39,7 @@ Let's start by looking at layers and how files written to a container are manage
     $ docker image pull mysql
     Using default tag: latest
     latest: Pulling from library/mysql
-    85b1f47fba49: Already exists
+    2a72cbf407d6: Already exists
     27dc53f13a11: Pull complete
     095c8ae4182d: Pull complete
     0972f6b9a7de: Pull complete
@@ -67,7 +67,152 @@ Let's start by looking at layers and how files written to a container are manage
     The first line in the the Dockerfile is: `FROM debian:jessie` This will import that layer into the MySQL image. 
 
     So layers are created by Dockerfiles and are are shared between images. When you start a container, a writeable layer is added to the base image. 
+    
+    Next you will create a file in our container, and see how that's represented on the host file system. 
 
+3. Start a Debian container, shell into it.   
+
+    ```
+    $ docker run --tty --interactive --name debian debian:stretch-slim bash
+    root@e09203d84deb:/#
+    ```
+
+4. Create a file and then list out the directory to make sure it's there:
+
+    ```
+    root@e09203d84deb:/# touch test-file
+    root@e09203d84deb:/# ls
+    bin   dev  home  lib64  mnt  proc  run   srv  test-file  usrboot  etc  lib   media  opt  root  sbin  sys  tmp        var
+    ```
+
+    We can see  `test-file` exists in the root of the containers file system. 
+
+    What has happened is that when a new file was written to the disk, the Docker storage driver placed that file in it's own layer. This is called *copy on write* - as soon as a change is detected the change is copied into the writeable layer. That layers is represented by a directory on the host file system. All of this is managed by the Docker storage driver. 
+
+5. Exit the container but leave it running by pressing `ctrl-p` and then `ctrl-q`
+
+    The Docker hosts for the labs today use OverlayFS with the [overlay2](https://docs.docker.com/engine/userguide/storagedriver/overlayfs-driver/#how-the-overlay2-driver-works) storage driver. 
+
+    OverlayFS layers two directories on a single Linux host and presents them as a single directory. These directories are called layers and the unification process is referred to as a union mount. OverlayFS refers to the lower directory as lowerdir and the upper directory a upperdir. "Upper" and "Lower" refer to when the layer was added to the image. In our example the writeable layer is the most "upper" layer.  The unified view is exposed through its own directory called merged. 
+
+    We can use Docker's *inspect* command to look at where these directories live on our Docker host's file system. 
+
+    > Note: The *inspect* command uses Go templates to allow us to extract out specific information from its output. For more information on how these templates work with *inspect* read this [excellent tutorial](http://container-solutions.com/docker-inspect-template-magic/). 
+
+    ```
+    $ docker inspect -f '{{json .GraphDriver.Data}}' debian | jq
+    {
+      "LowerDir": "/var/lib/docker/overlay2/0dad4d523351851af4872f8c6706fbdf36a6fa60dc7a29fff6eb388bf3d7194e-init/diff:/var/lib/docker/overlay2/c2e2db4221ad5dca9f35a92e04d17c79b861ddee30015fa3ddc77c66ae1bf758/diff",
+      "MergedDir": "/var/lib/docker/overlay2/0dad4d523351851af4872f8c6706fbdf36a6fa60dc7a29fff6eb388bf3d7194e/merged",
+      "UpperDir": "/var/lib/docker/overlay2/0dad4d523351851af4872f8c6706fbdf36a6fa60dc7a29fff6eb388bf3d7194e/diff",
+      "WorkDir": "/var/lib/docker/overlay2/0dad4d523351851af4872f8c6706fbdf36a6fa60dc7a29fff6eb388bf3d7194e/work"
+    }
+    ```
+    > Note: `WorkDir` is a working directory for the Overlay2 driver
+
+    Since the change we made is the newest modification to the Debian container's file system, it's going to be stored in `UpperDir`. 
+
+6. List the contents of the `UpperDir`. 
+
+    ```
+    $ cd $(docker inspect -f {{.GraphDriver.Data.UpperDir}} debian)
+    
+    $ ls
+    test-file
+    ```
+
+    `MergedDir` is going to give us a look at the root filesystem of our container which is a combination of `UpperDir` and `LowerDir`:
+
+7. List the contents of `MergedDir`:
+
+    ```
+    $ cd $(docker inspect -f {{.GraphDriver.Data.MergedDir}} debian)
+
+    $ ls
+    bin        etc        lib64      opt        run        sys        usr
+    boot       home       media      proc       sbin       test-file  var
+    dev        lib        mnt        root       srv        tmp
+    ```
+
+    Notice that the directory on our host file system has the same contents as the one inside the container. That's because that directory is what we see in the container. 
+
+    > Warning: You should NEVER manipulate your container's file system via the Docker host. This is only being done as an academic exercise. 
+
+8. Write a new file to the host file system in the `UpperDir`, and list the directory to see the contents
+
+    ```
+    $ cd $(docker inspect -f {{.GraphDriver.Data.UpperDir}} debian)
+
+    $ touch test-file2
+
+    $ ls
+    test-file   test-file2
+    ```
+
+
+9. Move back into your Debian container and list the root file system
+
+    ```
+    $ docker attach debian
+
+    root@674d7abf10c6:/# ls
+    bin   dev  home  lib64  mnt  proc  run   srv  test-file   tmp  var
+    boot  etc  lib   media  opt  root  sbin  sys  test-file2  usr
+    ```
+    
+    The file that was created on the local host filesystem (`test-file2`) is now available in the container as well. 
+
+10. Type `exit` to stop your container, which will also stop it
+
+    ```
+    root@674d7abf10c6:/# exit
+    exit
+    ```
+
+11. Ensure that your debian container still exists
+
+    ```
+    $ docker container ls --all
+    CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS           PORTS               NAMES
+    674d7abf10c6        debian:jessie       "bash"              36 minutes ago      Exited (0) 2 minutes ago                       debian
+    ```
+
+12. List out the current directory
+
+    ```
+    $ ls
+    test-file   test-file2
+    ```
+
+    Because the container still exists, the files are still available on  your file system. At this point you could `docker start` your container and it would be just as it was before you exited. 
+
+    However, if we remove the container, the directories on the host file system will be removed, and your changes will be gone
+
+13. Remove the container and list the directory contents
+
+    ```
+    $ docker container rm debian
+    debian
+
+    $ ls
+    ```
+
+    The files that were created are now gone. You've actually been left in a sort of "no man's land" as the directory you're in has actually been deleted as well.
+
+14. Copy the directory location from the prompt in the terminal. 
+
+15. CD back to your home directory
+
+    ```
+    $ cd
+    ```
+
+16. Attempt to list the contents of the old `UpperDir` directory.
+
+    ```
+    $ ls /var/lib/docker/overlay2/0dad4d523351851af4872f8c6706fbdf36a6fa60dc7a29fff6eb388bf3d7194e/diff
+    ls: /var/lib/docker/overlay2/0dad4d523351851af4872f8c6706fbdf36a6fa60dc7a29fff6eb388bf3d7194e/diff: No such file or directory
+    
 ## Understanding Docker Volumes
 
 [Docker volumes](https://docs.docker.com/engine/admin/volumes/volumes/) are directories on the host file system that are not managed by the storage driver. Since they are not managed by the storage drive they offer a couple of important benefits. 
